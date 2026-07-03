@@ -8,18 +8,19 @@ from model import MiniGPT
 # =========================
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# CPU-optimized settings (balanced for speed and quality)
+# CPU-optimized settings.
+# Good default for AMD Ryzen 3 PRO 2200G with 32GB RAM.
 if device == "cpu":
-    batch_size = 16  # Reasonable batch size
-    block_size = 128  # Sufficient context for learning
-    max_iters = 3000  # Enough iterations
+    batch_size = 16  # Lower to 8 if training becomes too slow
+    block_size = 128  # Context length used during training
+    max_iters = 5000  # More iterations help the small model learn better
     eval_interval = 500  
     learning_rate = 3e-4
     eval_iters = 10  # Reasonable evaluation
     
-    n_embd = 128  # Decent embedding size
-    n_head = 4  # Enough attention heads
-    n_layer = 4  # Good depth for learning
+    n_embd = 128  # Must be divisible by n_head
+    n_head = 4
+    n_layer = 4
     dropout = 0.1
     print(f"Using device: {device} (CPU-optimized but capable)")
     print(f"Settings: batch={batch_size}, context={block_size}, embd={n_embd}, layers={n_layer}, iters={max_iters}")
