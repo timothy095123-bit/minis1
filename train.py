@@ -1,6 +1,7 @@
 import os
 import torch
 import time
+# Assuming your MiniGPT model is imported from model.py
 from model import MiniGPT
 
 # =========================
@@ -8,26 +9,44 @@ from model import MiniGPT
 # =========================
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-batch_size = 4
-block_size = 96
-max_iters = 3000
-eval_interval = 500
-learning_rate = 3e-4
-eval_iters = 10
-
-n_embd = 96
-n_head = 4
-n_layer = 3
-dropout = 0.1
-
-print(f"Using device: {device}")
-print(f"Settings: batch={batch_size}, context={block_size}, embd={n_embd}, layers={n_layer}, iters={max_iters}")
+# CPU-optimized settings tailored for small custom Q&A memorization
+if device == "cpu":
+    batch_size = 8  
+    block_size = 64  # Lowered slightly to match short Q&A line limits better
+    max_iters = 6000  # Doubled iterations so the model completely overfits/memorizes the text
+    eval_interval = 500  
+    learning_rate = 5e-4  # Slightly higher learning rate for fast memorization
+    eval_iters = 10  
+    
+    n_embd = 96  
+    n_head = 4
+    n_layer = 3
+    dropout = 0.0  # Removed dropout so it memorizes perfectly instead of generalizing
+    print(f"Using device: {device} (CPU Overfit Mode)")
+else:
+    # GPU settings
+    batch_size = 32
+    block_size = 64
+    max_iters = 6000
+    eval_interval = 500  
+    learning_rate = 5e-4
+    eval_iters = 50
+    
+    n_embd = 128
+    n_head = 4
+    n_layer = 4
+    dropout = 0.0
+    print(f"Using device: {device} (GPU Overfit Mode)")
 
 torch.manual_seed(1337)
 
 # =========================
 # Load text
 # =========================
+if not os.path.exists("data/train.txt"):
+    print("Error: data/train.txt not found. Please create the file first.")
+    exit(1)
+
 with open("data/train.txt", "r", encoding="utf-8") as f:
     text = f.read()
 
@@ -41,30 +60,45 @@ stoi = {ch: i for i, ch in enumerate(chars)}
 itos = {i: ch for i, ch in enumerate(chars)}
 
 def encode(s):
-    return [stoi[c] for c in s]
+    return [stoi[c] for c in s if c in stoi]
 
 def decode(tokens):
     return "".join([itos[i] for i in tokens])
 
 data = torch.tensor(encode(text), dtype=torch.long)
 
-# train / validation split
-n = int(0.9 * len(data))
-train_data = data[:n]
-val_data = data[n:]
+# Small Dataset Fix: Use 100% of data for training to ensure perfect memorization
+train_data = data
+val_data = data 
 
 def get_batch(split):
     source = train_data if split == "train" else val_data
-    ix = torch.randint(len(source) - block_size, (batch_size,))
-    x = torch.stack([source[i:i + block_size] for i in ix])
-    y = torch.stack([source[i + 1:i + block_size + 1] for i in ix])
+    # Prevent index out of bounds if text is extremely short
+    max_idx = max(1, len(source) - block_size)
+    ix = torch.randint(0, max_idx, (batch_size,))
+    
+    x_list, y_list = [], []
+    for i in ix:
+        # Pad with 0 (or space character) if text segment is smaller than block_size
+        chunk_x = source[i:i + block_size]
+        chunk_y = source[i + 1:i + block_size + 1]
+        
+        if len(chunk_x) < block_size:
+            chunk_x = torch.cat([chunk_x, torch.zeros(block_size - len(chunk_x), dtype=torch.long)])
+        if len(chunk_y) < block_size:
+            chunk_y = torch.cat([chunk_y, torch.zeros(block_size - len(chunk_y), dtype=torch.long)])
+            
+        x_list.append(chunk_x)
+        y_list.append(chunk_y)
+        
+    x = torch.stack(x_list)
+    y = torch.stack(y_list)
     return x.to(device), y.to(device)
 
 @torch.no_grad()
 def estimate_loss(model):
     out = {}
     model.eval()
-
     for split in ["train", "val"]:
         losses = torch.zeros(eval_iters)
         for k in range(eval_iters):
@@ -72,7 +106,6 @@ def estimate_loss(model):
             _, loss = model(X, Y)
             losses[k] = loss.item()
         out[split] = losses.mean().item()
-
     model.train()
     return out
 
@@ -95,20 +128,17 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 # =========================
 print(f"\nStarting training for {max_iters} iterations...")
 print(f"Model parameters: {sum(p.numel() for p in model.parameters())/1e6:.2f}M")
-print(f"Will evaluate every {eval_interval} steps\n")
 
 start_time = time.time()
 for step in range(max_iters):
-    # Evaluate at intervals (skip step 0 to start training immediately)
     if step > 0 and (step % eval_interval == 0 or step == max_iters - 1):
         eval_start = time.time()
         losses = estimate_loss(model)
         eval_time = time.time() - eval_start
         elapsed = time.time() - start_time
-        print(f"step {step:4d} | train loss {losses['train']:.4f} | val loss {losses['val']:.4f} | time {elapsed:.1f}s | eval {eval_time:.1f}s")
+        print(f"step {step:4d} | train loss {losses['train']:.4f} | val loss {losses['val']:.4f} | time {elapsed:.1f}s")
 
-    # Show progress every 50 steps (without evaluation)
-    elif step % 50 == 0:
+    elif step % 100 == 0:
         elapsed = time.time() - start_time
         print(f"step {step:4d} | training... | time {elapsed:.1f}s")
 
@@ -142,12 +172,3 @@ checkpoint = {
 
 torch.save(checkpoint, "checkpoints/mini_llm.pt")
 print("Saved checkpoint to checkpoints/mini_llm.pt")
-
-# =========================
-# Quick test generation
-# =========================
-context = torch.zeros((1, 1), dtype=torch.long, device=device)
-generated = model.generate(context, max_new_tokens=300, temperature=0.9)[0].tolist()
-
-print("\n=== SAMPLE OUTPUT ===\n")
-print(decode(generated))

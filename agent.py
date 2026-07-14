@@ -13,6 +13,10 @@ print(f"Using device: {device}")
 # =========================
 # Load checkpoint
 # =========================
+if not os.path.exists("checkpoints/mini_llm.pt"):
+    print("Error: checkpoints/mini_llm.pt not found. Run the training script first.")
+    exit(1)
+
 checkpoint = torch.load("checkpoints/mini_llm.pt", map_location=device)
 
 stoi = checkpoint["stoi"]
@@ -47,10 +51,10 @@ model.eval()
 # =========================
 # Settings
 # =========================
-MAX_NEW_TOKENS = 700  # Allow longer multi-line/code responses
-TEMPERATURE = 0.4  # Lower temperature gives more stable CPU-trained output
+MAX_NEW_TOKENS = 250  
+TEMPERATURE = 0.01  # FIX: Set practically to 0 to force exact text lookup instead of guessing words
 MAX_HISTORY_CHARS = 1000
-TYPE_DELAY = 0.015  # mas mababa = mas mabilis mag-type
+TYPE_DELAY = 0.015  
 
 # =========================
 # Helpers
@@ -60,9 +64,6 @@ def clean_text(text: str) -> str:
     return text if text else "..."
 
 def type_out(text: str, delay: float = TYPE_DELAY):
-    """
-    Simulated streaming / typing effect.
-    """
     for ch in text:
         print(ch, end="", flush=True)
         time.sleep(delay)
@@ -73,9 +74,6 @@ def save_chat_log(chat_history: str, filename: str = "chat_log.txt"):
         f.write(chat_history)
 
 def build_model_prompt(prompt: str) -> str:
-    """
-    Match the training-data style so the model gets a familiar prefix.
-    """
     lowered = prompt.lower()
     known_prefixes = (
         "topic:",
@@ -98,9 +96,6 @@ def build_model_prompt(prompt: str) -> str:
     return f"Topic: {prompt}\n"
 
 def generate_response(prompt: str, history: str = "") -> str:
-    """
-    Generate text based on the prompt using a format similar to data/train.txt.
-    """
     full_prompt = build_model_prompt(prompt)
 
     encoded = encode(full_prompt)
@@ -118,21 +113,17 @@ def generate_response(prompt: str, history: str = "") -> str:
 
     full_output = decode(generated)
     
-    # Remove the formatted model prompt from the output
+    # Extract only the newly generated text
     if full_output.startswith(full_prompt):
         reply = full_output[len(full_prompt):].strip()
     else:
         reply = full_output.strip()
     
-    # Keep blank lines and code blocks, but stop if generation drifts into
-    # another training entry.
-    next_topic_pos = reply.find("\nTopic:")
-    if next_topic_pos != -1:
-        reply = reply[:next_topic_pos].strip()
-
-    # Limit very long output without destroying normal code formatting.
-    if len(reply) > 1200:
-        reply = reply[:1200].rstrip() + "..."
+    # Stop generation cleanly if it loops back into another dataset block
+    for separator in ["\nTopic:", "\nQuestion:", "\nAnswer:"]:
+        sep_pos = reply.find(separator)
+        if sep_pos != -1:
+            reply = reply[:sep_pos].strip()
 
     return clean_text(reply)
 
@@ -186,10 +177,10 @@ while True:
     if user_input.lower().startswith("/temp "):
         try:
             value = float(user_input.split(" ", 1)[1])
-            if value <= 0:
-                print("Agent: Temperature must be greater than 0.")
+            if value < 0:
+                print("Agent: Temperature cannot be negative.")
                 continue
-            TEMPERATURE = value
+            TEMPERATURE = max(0.01, value)  # Prevent complete 0 split errors
             print(f"Agent: Temperature set to {TEMPERATURE}")
         except ValueError:
             print("Agent: Invalid temperature value.")
@@ -201,7 +192,6 @@ while True:
     type_out(response, TYPE_DELAY)
     print()
 
-    # Store simpler history - just for logging, not used in generation
     chat_history += f"User: {user_input}\nAgent: {response}\n"
 
     if len(chat_history) > MAX_HISTORY_CHARS:
