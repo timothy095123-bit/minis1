@@ -52,7 +52,7 @@ model.eval()
 # Settings
 # =========================
 MAX_NEW_TOKENS = 250  
-TEMPERATURE = 0.01  # FIX: Set practically to 0 to force exact text lookup instead of guessing words
+TEMPERATURE = 0.01  # Low temperature makes it strictly follow your train.txt weights
 MAX_HISTORY_CHARS = 1000
 TYPE_DELAY = 0.015  
 
@@ -74,22 +74,55 @@ def save_chat_log(chat_history: str, filename: str = "chat_log.txt"):
         f.write(chat_history)
 
 def build_model_prompt(prompt: str) -> str:
-    lowered = prompt.lower()
+    lowered = prompt.lower().replace("?", "").strip()
+    words = lowered.split()
+    
+    # 1. Handle explicit dataset formatting typed manually by the user
     known_prefixes = (
-        "topic:",
-        "question:",
-        "answer:",
-        "problem:",
-        "explanation:",
-        "solution:",
-        "analysis:",
-        "concept:",
+        "topic:", "question:", "answer:", "problem:", 
+        "explanation:", "solution:", "analysis:", "concept:"
     )
-    question_starters = ("what ", "why ", "how ", "when ", "where ", "who ", "which ")
-
     if lowered.startswith(known_prefixes):
         return prompt
 
+    # 2. Smart Scenario Matching (Prioritizes exact overfitted paths)
+    if "vision" in words or "vision" in lowered:
+        return "Question: What is the vision of TMC?\nAnswer:"
+    if "mission" in words or "mission" in lowered:
+        return "Question: What is the mission of TMC?\nAnswer:"
+    if "goal" in words or "goal" in lowered:
+        return "Question: What is the goal of TMC?\nAnswer:"
+    if "philosophy" in words or "philosophy" in lowered:
+        return "Question: What is the philosophy of TMC?\nAnswer:"
+    if "slogan" in words or "slogan" in lowered:
+        return "Question: What is the slogan of TMC?\nAnswer:"
+    
+    # Creator and developer questions
+    if "creator" in words or "creator" in lowered:
+        return "Question: Who is your creator?\nAnswer:"
+    if "made" in words or "maker" in words or "make" in words:
+        return "Question: Who made you?\nAnswer:"
+    if "developer" in words or "developed" in words:
+        return "Question: Who developed you?\nAnswer:"
+    
+    # Student queries
+    if "student" in words or "marbas" in words or "alfred" in words:
+        return "Question: What the student name?\nAnswer:"
+        
+    # Trivia items
+    if "drug" in words or "drugs" in words:
+        return "Question: What is a drug?\nAnswer:"
+    if "dream" in words or "dreams" in words:
+        return "Question: What is a dream?\nAnswer:"
+    if "what are you" in lowered or "who are you" in lowered or "what you are" in lowered:
+        return "Question: What are you?\nAnswer:"
+        
+    # Base TMC string fallback check
+    if "tmc" in lowered or "tmc's" in lowered or "stand" in lowered:
+        return "Question: What is TMC's?\nAnswer:"
+
+    # 3. Dynamic fallback if no explicit rule hits
+    question_starters = ("what ", "why ", "how ", "when ", "where ", "who ", "which ")
     if prompt.endswith("?") or lowered.startswith(question_starters):
         return f"Question: {prompt}\nAnswer:"
 
@@ -97,6 +130,19 @@ def build_model_prompt(prompt: str) -> str:
 
 def generate_response(prompt: str, history: str = "") -> str:
     full_prompt = build_model_prompt(prompt)
+
+    # Perfect Dataset Lookup Check to eliminate model scrambling
+    if os.path.exists("data/train.txt") and full_prompt.startswith("Question:"):
+        clean_q = full_prompt.split("\nAnswer:")[0].replace("Question:", "").strip().lower()
+        with open("data/train.txt", "r", encoding="utf-8") as f:
+            lines = f.readlines()
+        for i, line in enumerate(lines):
+            if line.strip().lower().startswith("question:"):
+                line_q = line.replace("Question:", "").strip().lower()
+                if line_q == clean_q and (i + 1) < len(lines):
+                    next_line = lines[i + 1].strip()
+                    if next_line.startswith("Answer:"):
+                        return clean_text(next_line.replace("Answer:", "").strip())
 
     encoded = encode(full_prompt)
     if not encoded:
@@ -113,22 +159,22 @@ def generate_response(prompt: str, history: str = "") -> str:
 
     full_output = decode(generated)
     
-    # Extract only the newly generated text
+    # Cut off prompt prefix to extract just the new tokens
     if full_output.startswith(full_prompt):
         reply = full_output[len(full_prompt):].strip()
     else:
         reply = full_output.strip()
     
-    # Stop generation cleanly if it loops back into another dataset block
-    for separator in ["\nTopic:", "\nQuestion:", "\nAnswer:"]:
-        sep_pos = reply.find(separator)
-        if sep_pos != -1:
-            reply = reply[:sep_pos].strip()
+    # PURE DATA BOUNDARY STOPPING
+    # Cleans up and chops output cleanly if it attempts to bleed into other structural rows
+    for separator in ["\nQuestion:", "\nTopic:", "\nAnswer:", "Question:", "Topic:"]:
+        if separator in reply:
+            reply = reply.split(separator)[0].strip()
 
     return clean_text(reply)
 
 # =========================
-# Intro
+# Intro UI
 # =========================
 print("\nMini LLM Agent")
 print("Commands:")
@@ -180,7 +226,7 @@ while True:
             if value < 0:
                 print("Agent: Temperature cannot be negative.")
                 continue
-            TEMPERATURE = max(0.01, value)  # Prevent complete 0 split errors
+            TEMPERATURE = max(0.01, value)
             print(f"Agent: Temperature set to {TEMPERATURE}")
         except ValueError:
             print("Agent: Invalid temperature value.")
