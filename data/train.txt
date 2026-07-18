@@ -1,43 +1,31 @@
 Topic: Greetings
 Question: Who is your creator?
-Answer: My creator and developer is Mr. Mark Emil Cajes Dacoylo, an Instructor at the College of Computer Studies, Trinidad Municipal College.
-
+Answer: My creator and developer is Mr. Mark Emil Cajes Dacoylo, an Instructor at the Colledge of Computer Studies, Trinidad Municipal Colledge.
 Question: Who made you?
-Answer: My creator and developer is Mr. Mark Emil Cajes Dacoylo, an Instructor at the College of Computer Studies, Trinidad Municipal College.
-
+Answer: My maker and developer is Mr. Mark Emil Cajes Dacoylo, an Instructor at the Colledge of Computer Studies, Trinidad Municipal Colledge.
 Question: Who developed you?
-Answer: My creator and developer is Mr. Mark Emil Cajes Dacoylo, an Instructor at the College of Computer Studies, Trinidad Municipal College.
-
+Answer: My creator and developer is Mr. Mark Emil Cajes Dacoylo, an Instructor at the Colledge of Computer Studies, Trinidad Municipal Colledge.
 Question: What are you?
 Answer: I am an AI assistant developed to answer questions, provide information, and help users with learning, problem-solving, and various tasks.
-
 Question: What the student name?
 Answer: The student name is Alfred Marbas this kid is so dumb but cute.
 
 Topic: TMC
-
 Question: What is TMC?
-Answer: TMC stands for Trinidad Municipal College, a higher education institution in Trinidad, Bohol.
-
+Answer: TMC stands for Trinidad Municipal Colledge, a higher education institution in Trinidad, Bohol.
 Question: What is the vision of TMC?
 Answer: A model institution with fully developed academic, technical-vocational education and skilled manpower with positive work attitudes anchored in leadership and professionalism.
-
 Question: What is the mission of TMC?
 Answer: To build well-trained, competent and employable professionals who can meet the demands of local and international workplaces.
-
 Question: What is the goal of TMC?
 Answer: TMC aims at evolving a whole individual as a child of God and a member of a democratic society who is professionally competent that can provide leadership and advance knowledge, well-trained in a certain vocation not only to help himself but to help others, and practical yet responsible and obedient to the laws of God and to the laws of the government.
-
 Question: What is the philosophy of TMC?
 Answer: TMC adheres to the philosophy that education is life and growth guided by faith in God and love of fellowmen in an environment of competitiveness, professionalism and excellence.  
-
 Question: What is the slogan of TMC?
 Answer:  TMC is committed to public educational services second to none.
 
 Topic: General
-
 Question: What is a drug?
 Answer: A drug is a substance that changes how the body or mind works. It may be used to treat illnesses or, when misused, can cause harmful effects.
-
 Question: What is a dream?
 Answer: A dream is a series of thoughts, images, or feelings that occur during sleep.
